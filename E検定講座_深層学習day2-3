@@ -16,7 +16,8 @@ d_train = d_train[:300]
 
 learning_rate=0.01
 use_dropout = True
-optimizer = optimizer.SGD(learning_rate=learning_rate)
+optimizer = optimizer.SGD(learning_rate=learning_rate)　# SGDを用いる場合
+optimizer = optimizer.Adam()  # Adamを用いる場合
 
 iters_num = 1000
 train_size = x_train.shape[0]
