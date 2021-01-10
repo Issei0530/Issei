@@ -1,1 +1,120 @@
+import sys, os
+sys.path.append(os.pardir)  # 親ディレクトリのファイルをインポートするための設定
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Activation, SimpleRNN
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
+
+#### 今回は減衰振動する関数にノイズの入ったデータを一定区間学習し、その後の区間を予測できるかを検証する
+#### 減衰振動の式は $ y = a e^{- \gamma t}cos(\omega t + \alpha) $ で、これにノイズ項を入れる
+
+# 減衰振動の式
+def f(decay_rate, frequency, time, scale=1, freq_bias=0):
+    y = scale * np.exp(-decay_rate * time) * np.cos(frequency * time + freq_bias)
+    return y
+
+# ノイズ入りの減衰振動の式の作成
+decay_rate = 0.1
+epoch = 1001
+frequency = np.pi * 2
+x_time = np.linspace(0, 10, epoch)
+np.random.seed(1)
+y_data = f(decay_rate=decay_rate, frequency=frequency, time=x_time) + np.random.randn((epoch)) / epoch**0.3
+
+# 得られた値をリストに入れる
+data_list = []
+for i in range(len(x_time)):
+    data_list.append([x_time[i], y_data[i]])
+plt.plot([r[0] for r in data_list],
+         [r[1] for r in data_list],
+         linewidth=0, marker='o', markeredgewidth=0.2, alpha=0.3)
+
+neuron_in = 1  # 入力層ノード数
+neuron_mid = 100  # 中間層ノード数
+neuron_out = 1  # 出力層ノード数
+batch_size = 50  # バッチサイズ
+
+# 1回の入力数
+input_len = 100
+# 学習の回数
+sample_len = len(y_data) - input_len
+input_data = np.zeros((sample_len, input_len))
+correct_data = np.zeros((sample_len, input_len))
+
+for i in range(0, sample_len):
+    input_data[i] = y_data[i : i + input_len]
+    correct_data[i] = y_data[i + 1 : i + input_len + 1]
+
+input_data = input_data.reshape(sample_len, input_len, 1)
+correct_data = correct_data.reshape(sample_len, input_len, 1)
+
+model = Sequential()
+model.add(SimpleRNN(neuron_mid, input_shape=(input_len, neuron_in), return_sequences=True))
+model.add(Dense(neuron_out, activation="linear"))
+model.compile(loss="mean_squared_error", optimizer="Adam")
+early_stopping = EarlyStopping(monitor='val_loss', mode='auto', patience=20)
+history = model.fit(input_data, correct_data, epochs=100, batch_size=batch_size, validation_split=0.1, verbose=0)
+
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+
+plt.plot(np.arange(len(loss)), loss, label='loss')
+plt.plot(np.arange(len(val_loss)), val_loss, label='val_loss')
+plt.legend()
+plt.show()
+
+predicted = input_data[0].reshape(-1)
+for i in range(0, sample_len):
+    y = model.predict(predicted[-input_len:].reshape(1, input_len, 1))
+    predicted = np.append(predicted, y[0][input_len-1][0])
+plt.plot(x_time, y_data, label="training data")
+plt.plot(x_time, predicted, label="predicted")
+plt.legend()
+plt.show()
+
+# 1回の入力数
+input_len = 500
+# 学習の回数
+sample_len = len(y_data) - input_len
+input_data = np.zeros((sample_len, input_len))
+correct_data = np.zeros((sample_len, input_len))
+
+for i in range(0, sample_len):
+    input_data[i] = y_data[i : i + input_len]
+    correct_data[i] = y_data[i + 1 : i + input_len + 1]
+
+input_data = input_data.reshape(sample_len, input_len, 1)
+correct_data = correct_data.reshape(sample_len, input_len, 1)
+
+model = Sequential()
+model.add(SimpleRNN(neuron_mid, input_shape=(input_len, neuron_in), return_sequences=True))
+model.add(Dense(neuron_out, activation="linear"))
+model.compile(loss="mean_squared_error", optimizer="Adam")
+early_stopping = EarlyStopping(monitor='val_loss', mode='auto', patience=20)
+history = model.fit(input_data, correct_data, epochs=50, batch_size=batch_size, validation_split=0.1, verbose=0)
+
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+
+plt.plot(np.arange(len(loss)), loss, label='loss')
+plt.plot(np.arange(len(val_loss)), val_loss, label='val_loss')
+plt.legend()
+plt.show()
+
+predicted = input_data[0].reshape(-1)
+for i in range(0, sample_len):
+    y = model.predict(predicted[-input_len:].reshape(1, input_len, 1))
+    predicted = np.append(predicted, y[0][input_len-1][0])
+
+plt.plot(np.arange(len(y_data)), y_data, label="training data")
+plt.plot(np.arange(len(y_data)), predicted, label="predicted")
+plt.legend()
+plt.show()
 
